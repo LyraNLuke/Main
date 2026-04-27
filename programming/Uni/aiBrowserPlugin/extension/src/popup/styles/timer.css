@@ -1,0 +1,125 @@
+.timer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.timer-idle {
+  width: 100%;
+}
+
+.start-btn {
+  width: 100%;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.timer-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.countdown-display {
+  font-size: 64px;
+  font-weight: 700;
+  color: #667eea;
+  animation: countdownPulse 1s ease-in-out infinite;
+}
+
+@keyframes countdownPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.countdown-text {
+  font-size: 16px;
+  color: #666;
+  margin: 0;
+}
+
+.timer-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.05) 0%, rgba(255, 87, 34, 0.05) 100%);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.timer-display {
+  font-size: 48px;
+  font-weight: 700;
+  color: #ff9800;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+}
+
+.pause-btn,
+.resume-btn,
+.stop-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 100px;
+}
+
+.pause-btn,
+.resume-btn {
+  background-color: #fff3e0;
+  color: #ff9800;
+  border: 1px solid #ff9800;
+}
+
+.pause-btn:hover,
+.resume-btn:hover {
+  background-color: #ff9800;
+  color: white;
+}
+
+.stop-btn {
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #d32f2f;
+}
+
+.stop-btn:hover {
+  background-color: #d32f2f;
+  color: white;
+}

@@ -1,0 +1,132 @@
+.subtask-row {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  transition: all 0.3s;
+  overflow: hidden;
+}
+
+.subtask-row:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.subtask-row.completed {
+  background-color: #f0f7f0;
+  border-color: #4caf50;
+}
+
+.subtask-row.in-progress {
+  background-color: #fff3e0;
+  border-color: #ff9800;
+}
+
+.subtask-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.subtask-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.status-icon {
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.subtask-row.completed .status-icon {
+  color: #4caf50;
+}
+
+.subtask-row.in-progress .status-icon {
+  color: #ff9800;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.index {
+  font-weight: 600;
+  color: #999;
+  font-size: 14px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+}
+
+.subtask-row.completed .title {
+  color: #999;
+  text-decoration: line-through;
+}
+
+.subtask-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #666;
+}
+
+.time-badge {
+  background-color: #e3f2fd;
+  color: #1565c0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.expand-icon {
+  transition: transform 0.3s;
+  font-size: 12px;
+}
+
+.subtask-row.expanded .expand-icon {
+  transform: rotate(180deg);
+}
+
+.subtask-content {
+  padding: 15px;
+  border-top: 1px solid #e0e0e0;
+  background-color: #fafafa;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.description {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 15px;
+  line-height: 1.4;
+}
