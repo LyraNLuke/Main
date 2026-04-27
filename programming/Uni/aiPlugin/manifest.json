@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Task Decomposer Widget",
+  "version": "1.0",
+  "description": "A floating widget to break down tasks with AI",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["web/content.js"],
+      "css": ["web/styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "web/popup.html",
+    "default_title": "Task Decomposer"
+  },
+  "icons": {
+    "16": "media/icon16.svg",
+    "48": "media/icon48.svg",
+    "128": "media/icon128.svg"
+  }
+}
