@@ -1,127 +1,488 @@
 /**
  * Content Script for Task Breakdown Assistant
- * Injects a floating widget button into web pages
+ * Injects a floating widget and panel into web pages
  */
 
-interface FloatingButtonState {
-  isMinimized: boolean;
-  currentTaskId: string | null;
-  currentSubtaskId: string | null;
-  elapsedTime: number;
+interface WidgetState {
+  isOpen: boolean;
+  left: number;
+  top: number;
 }
 
-let state: FloatingButtonState = {
-  isMinimized: true,
-  currentTaskId: null,
-  currentSubtaskId: null,
-  elapsedTime: 0,
+const STORAGE_KEY = 'taskAssistantWidgetState';
+const DEFAULT_WIDGET_WIDTH = 520;
+const DEFAULT_WIDGET_HEIGHT = 760;
+const MINIMIZED_WIDTH = 320;
+const MINIMIZED_HEIGHT = 72;
+
+let widgetState: WidgetState = {
+  isOpen: false,
+  left: window.innerWidth - 90,
+  top: window.innerHeight - 90,
 };
 
-function createFloatingButton() {
-  // Check if button already exists
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let widgetContainer: HTMLDivElement | null = null;
+let panelWrapper: HTMLDivElement | null = null;
+let minimizedBar: HTMLDivElement | null = null;
+let minimizedTitle: HTMLDivElement | null = null;
+let minimizedTime: HTMLDivElement | null = null;
+let minimizedStatusIcon: HTMLSpanElement | null = null;
+let toggleButton: HTMLButtonElement | null = null;
+let activeSession: any = null;
+let minimizedTimerInterval: number | null = null;
+
+function saveWidgetState() {
+  chrome.storage.local.set({ [STORAGE_KEY]: widgetState });
+}
+
+function clampPosition(left: number, top: number) {
+  const width = widgetState.isOpen ? DEFAULT_WIDGET_WIDTH : MINIMIZED_WIDTH;
+  const height = widgetState.isOpen ? DEFAULT_WIDGET_HEIGHT : MINIMIZED_HEIGHT;
+  const maxLeft = Math.max(10, window.innerWidth - width - 10);
+  const maxTop = Math.max(10, window.innerHeight - height - 10);
+  return {
+    left: Math.min(Math.max(10, left), maxLeft),
+    top: Math.min(Math.max(10, top), maxTop),
+  };
+}
+
+function applyWidgetPosition() {
+  if (!widgetContainer) return;
+  widgetContainer.style.left = `${widgetState.left}px`;
+  widgetContainer.style.top = `${widgetState.top}px`;
+}
+
+function findActiveSubtask(session: any) {
+  if (!session || !Array.isArray(session.tasks)) return null;
+
+  // Prefer the currently marked active task, but only if it is still in-progress.
+  if (session.currentTaskId && session.currentSubtaskId) {
+    const task = session.tasks.find((t: any) => t.id === session.currentTaskId);
+    const subtask = task?.subtasks?.find((s: any) => s.id === session.currentSubtaskId);
+    if (task && subtask && subtask.status === 'in-progress') {
+      return { task, subtask };
+    }
+  }
+
+  // Fall back to any in-progress subtasks if the IDs were not persisted correctly.
+  for (const task of session.tasks) {
+    const subtask = task.subtasks.find((s: any) => s.status === 'in-progress');
+    if (subtask) return { task, subtask };
+  }
+
+  return null;
+}
+
+function hasActiveTask(session: any) {
+  return !!findActiveSubtask(session);
+}
+
+function getActiveTaskDisplay(session: any) {
+  const active = findActiveSubtask(session);
+  if (!active) return null;
+
+  const { task, subtask } = active;
+  let seconds = subtask.timeSpent || 0;
+  if (subtask.status === 'in-progress' && subtask.startTime) {
+    seconds += Math.floor((Date.now() - subtask.startTime) / 1000);
+  }
+
+  return {
+    title: subtask.title,
+    time: formatTime(seconds),
+  };
+}
+
+function refreshWidgetView() {
+  if (!panelWrapper || !minimizedBar || !toggleButton || !widgetContainer) return;
+
+  const active = hasActiveTask(activeSession);
+  if (widgetState.isOpen) {
+    panelWrapper.style.display = 'block';
+    minimizedBar.style.display = 'none';
+    toggleButton.style.display = 'none';
+    widgetContainer.style.width = `${DEFAULT_WIDGET_WIDTH}px`;
+    return;
+  }
+
+  if (active) {
+    panelWrapper.style.display = 'none';
+    minimizedBar.style.display = 'flex';
+    toggleButton.style.display = 'none';
+    widgetContainer.style.width = `${MINIMIZED_WIDTH}px`;
+  } else {
+    panelWrapper.style.display = 'none';
+    minimizedBar.style.display = 'none';
+    toggleButton.style.display = 'flex';
+    widgetContainer.style.width = 'auto';
+  }
+}
+
+function togglePanel(shouldOpen?: boolean) {
+  widgetState.isOpen = shouldOpen !== undefined ? shouldOpen : !widgetState.isOpen;
+  if (!panelWrapper || !minimizedBar || !widgetContainer || !toggleButton) return;
+
+  if (!hasActiveTask(activeSession) && widgetState.isOpen === false) {
+    // if there is no active task and we are minimizing, show round button instead of minimized card
+    widgetState.isOpen = false;
+  }
+
+  saveWidgetState();
+  refreshWidgetView();
+}
+
+function setMinimizedStatusIcon(active: boolean) {
+  if (!minimizedStatusIcon) return;
+  if (active) {
+    minimizedStatusIcon.textContent = '⏳';
+    minimizedStatusIcon.style.background = 'rgba(255, 243, 224, 0.9)';
+    minimizedStatusIcon.style.color = '#ff9800';
+  } else {
+    minimizedStatusIcon.textContent = '•';
+    minimizedStatusIcon.style.background = 'rgba(237, 242, 247, 0.9)';
+    minimizedStatusIcon.style.color = '#65748b';
+  }
+}
+
+function stopMinimizedTimer() {
+  if (minimizedTimerInterval !== null) {
+    window.clearInterval(minimizedTimerInterval);
+    minimizedTimerInterval = null;
+  }
+}
+
+function startMinimizedTimer() {
+  stopMinimizedTimer();
+  minimizedTimerInterval = window.setInterval(() => {
+    if (!activeSession || !hasActiveTask(activeSession)) {
+      stopMinimizedTimer();
+      return;
+    }
+
+    const activeTaskDisplay = getActiveTaskDisplay(activeSession);
+    if (!activeTaskDisplay) {
+      stopMinimizedTimer();
+      return;
+    }
+
+    if (minimizedTime) {
+      minimizedTime.textContent = activeTaskDisplay.time;
+    }
+  }, 1000);
+}
+
+function updateMinimizedInfo(session: any) {
+  activeSession = session;
+  if (!minimizedTitle || !minimizedTime) return;
+
+  const activeTaskDisplay = getActiveTaskDisplay(session);
+  if (!activeTaskDisplay) {
+    minimizedTitle.textContent = 'No active task';
+    minimizedTime.textContent = '00:00';
+    setMinimizedStatusIcon(false);
+    stopMinimizedTimer();
+    widgetState.isOpen = false;
+    refreshWidgetView();
+    return;
+  }
+
+  minimizedTitle.textContent = activeTaskDisplay.title;
+  minimizedTime.textContent = activeTaskDisplay.time;
+  setMinimizedStatusIcon(true);
+  startMinimizedTimer();
+  refreshWidgetView();
+}
+
+
+function createFloatingWidget() {
   if (document.getElementById('task-assistant-widget')) {
     return;
   }
 
-  const container = document.createElement('div');
-  container.id = 'task-assistant-widget';
-  container.style.cssText = `
+  widgetContainer = document.createElement('div');
+  widgetContainer.id = 'task-assistant-widget';
+  widgetContainer.style.cssText = `
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 10000;
+    left: ${widgetState.left}px;
+    top: ${widgetState.top}px;
+    z-index: 2147483647;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    pointer-events: auto;
+    width: ${widgetState.isOpen ? DEFAULT_WIDGET_WIDTH : MINIMIZED_WIDTH}px;
   `;
 
-  const button = document.createElement('button');
-  button.id = 'task-assistant-btn';
-  button.style.cssText = `
+  panelWrapper = document.createElement('div');
+  panelWrapper.id = 'task-assistant-panel-wrapper';
+  panelWrapper.style.cssText = `
+    width: 100%;
+    height: ${DEFAULT_WIDGET_HEIGHT}px;
+    border-radius: 24px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.25);
+    display: ${widgetState.isOpen ? 'block' : 'none'};
+  `;
+
+  const panelHeader = document.createElement('div');
+  panelHeader.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background: #f8f9fb;
+    padding: 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    cursor: grab;
+  `;
+
+  const closeButton = document.createElement('button');
+  closeButton.textContent = '✕';
+  closeButton.title = 'Minimize assistant panel';
+  closeButton.style.cssText = `
+    all: unset;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #222;
+    background: rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0,0,0,0.1);
+    transition: background 0.2s, transform 0.2s;
+  `;
+  closeButton.addEventListener('mouseover', () => {
+    closeButton.style.background = 'rgba(0,0,0,0.14)';
+    closeButton.style.transform = 'scale(1.05)';
+  });
+  closeButton.addEventListener('mouseout', () => {
+    closeButton.style.background = 'rgba(0, 0, 0, 0.08)';
+    closeButton.style.transform = 'scale(1)';
+  });
+  closeButton.addEventListener('click', () => togglePanel(false));
+
+  panelHeader.appendChild(closeButton);
+
+  const iframe = document.createElement('iframe');
+  iframe.src = chrome.runtime.getURL('popup.html');
+  iframe.style.cssText = `
+    width: 100%;
+    height: calc(100% - 48px);
+    border: none;
+  `;
+
+  panelWrapper.appendChild(panelHeader);
+  panelWrapper.appendChild(iframe);
+
+  minimizedBar = document.createElement('div');
+  minimizedBar.id = 'task-assistant-minimized-bar';
+  minimizedBar.style.cssText = `
+    width: 100%;
+    min-height: ${MINIMIZED_HEIGHT}px;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid rgba(224, 224, 224, 0.95);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
+    display: ${widgetState.isOpen ? 'none' : 'flex'};
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    gap: 12px;
+    cursor: grab;
+  `;
+
+  const minimizedText = document.createElement('div');
+  minimizedText.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  `;
+
+  const minimizedHeader = document.createElement('div');
+  minimizedHeader.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  `;
+
+  const statusIcon = document.createElement('span');
+  minimizedStatusIcon = statusIcon;
+  statusIcon.id = 'task-assistant-minimized-status-icon';
+  statusIcon.textContent = '⏳';
+  statusIcon.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    background: rgba(255, 243, 224, 0.9);
+    color: #ff9800;
+    font-size: 14px;
+  `;
+
+  minimizedTitle = document.createElement('div');
+  minimizedTitle.id = 'task-assistant-minimized-title';
+  minimizedTitle.style.cssText = `
+    font-size: 15px;
+    font-weight: 600;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  `;
+  minimizedTitle.textContent = 'No active task';
+
+  minimizedHeader.appendChild(statusIcon);
+  minimizedHeader.appendChild(minimizedTitle);
+
+  const minimizedMeta = document.createElement('div');
+  minimizedMeta.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `;
+
+  minimizedTime = document.createElement('div');
+  minimizedTime.id = 'task-assistant-minimized-time';
+  minimizedTime.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  `;
+  minimizedTime.textContent = '00:00';
+
+  minimizedMeta.appendChild(minimizedTime);
+  minimizedText.appendChild(minimizedHeader);
+  minimizedText.appendChild(minimizedMeta);
+
+  const expandButton = document.createElement('button');
+  expandButton.textContent = '▴';
+  expandButton.title = 'Restore assistant panel';
+  expandButton.style.cssText = `
+    all: unset;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  `;
+  expandButton.addEventListener('mouseover', () => {
+    expandButton.style.transform = 'scale(1.05)';
+    expandButton.style.boxShadow = '0 8px 18px rgba(0, 0, 0, 0.18)';
+  });
+  expandButton.addEventListener('mouseout', () => {
+    expandButton.style.transform = 'scale(1)';
+    expandButton.style.boxShadow = 'none';
+  });
+  expandButton.addEventListener('click', () => togglePanel(true));
+
+  minimizedBar.appendChild(minimizedText);
+  minimizedBar.appendChild(expandButton);
+
+  toggleButton = document.createElement('button');
+  toggleButton.id = 'task-assistant-toggle-btn';
+  toggleButton.textContent = '✓';
+  toggleButton.title = 'Open task assistant';
+  toggleButton.style.cssText = `
+    all: unset;
     width: 60px;
     height: 60px;
     border-radius: 50%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 24px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s, box-shadow 0.2s;
   `;
-  button.innerHTML = '✓';
-  button.title = 'Task Breakdown Assistant';
-
-  button.addEventListener('mouseover', () => {
-    button.style.transform = 'scale(1.1)';
-    button.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
+  toggleButton.addEventListener('mouseover', () => {
+    toggleButton!.style.transform = 'scale(1.05)';
+    toggleButton!.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
   });
-
-  button.addEventListener('mouseout', () => {
-    button.style.transform = 'scale(1)';
-    button.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.2)';
+  toggleButton.addEventListener('mouseout', () => {
+    toggleButton!.style.transform = 'scale(1)';
+    toggleButton!.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.2)';
   });
+  toggleButton.addEventListener('click', () => togglePanel(true));
 
-  button.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'openPopup' });
-  });
-
-  // Allow dragging
-  let isDragging = false;
-  let offsetX = 0;
-  let offsetY = 0;
-
-  button.addEventListener('mousedown', (e) => {
+  const dragStart = (event: PointerEvent) => {
+    if ((event.target as HTMLElement).closest('button')) {
+      return;
+    }
     isDragging = true;
-    offsetX = e.clientX - button.getBoundingClientRect().left;
-    offsetY = e.clientY - button.getBoundingClientRect().top;
-  });
+    dragOffsetX = event.clientX - widgetState.left;
+    dragOffsetY = event.clientY - widgetState.top;
+    event.preventDefault();
+  };
 
-  document.addEventListener('mousemove', (e) => {
-    if (isDragging && container) {
-      container.style.right = `${window.innerWidth - e.clientX + offsetX}px`;
-      container.style.bottom = `${window.innerHeight - e.clientY + offsetY}px`;
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
-
-  container.appendChild(button);
-  document.body.appendChild(container);
-
-  // Listen for storage changes to update minimized view
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.taskBreakdownSession) {
-      updateMinimizedDisplay(changes.taskBreakdownSession.newValue);
-    }
-  });
-
-  // Initial update
-  chrome.storage.local.get(['taskBreakdownSession'], (result) => {
-    if (result.taskBreakdownSession) {
-      updateMinimizedDisplay(result.taskBreakdownSession);
-    }
-  });
-}
-
-function updateMinimizedDisplay(session: any) {
-  const button = document.getElementById('task-assistant-btn');
-  if (!button || !session) return;
-
-  const { currentTaskId, currentSubtaskId, tasks } = session;
-
-  if (currentSubtaskId && currentTaskId) {
-    const task = tasks.find((t: any) => t.id === currentTaskId);
-    if (task) {
-      const subtask = task.subtasks.find((s: any) => s.id === currentSubtaskId);
-      if (subtask) {
-        button.title = `${subtask.title}\nTime: ${formatTime(subtask.timeSpent)}`;
-      }
-    }
+  panelHeader.addEventListener('pointerdown', dragStart);
+  minimizedBar.addEventListener('pointerdown', dragStart);
+  if (widgetContainer) {
+    widgetContainer.addEventListener('pointerdown', dragStart);
   }
+
+  document.addEventListener('pointermove', (event) => {
+    if (!isDragging || !widgetContainer) return;
+    const left = event.clientX - dragOffsetX;
+    const top = event.clientY - dragOffsetY;
+    const clamped = clampPosition(left, top);
+    widgetState.left = clamped.left;
+    widgetState.top = clamped.top;
+    applyWidgetPosition();
+  });
+
+  document.addEventListener('pointerup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    saveWidgetState();
+  });
+
+  widgetContainer.appendChild(panelWrapper);
+  widgetContainer.appendChild(minimizedBar);
+  widgetContainer.appendChild(toggleButton);
+  document.body.appendChild(widgetContainer);
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    const savedState = changes[STORAGE_KEY]?.newValue;
+    if (savedState) {
+      widgetState = { ...widgetState, ...savedState };
+      applyWidgetPosition();
+    }
+    if (changes.taskBreakdownSession) {
+      updateMinimizedInfo(changes.taskBreakdownSession.newValue);
+    }
+  });
+
+  chrome.storage.local.get(['taskBreakdownSession'], (result) => {
+    updateMinimizedInfo(result.taskBreakdownSession || null);
+  });
 }
 
 function formatTime(seconds: number): string {
@@ -138,9 +499,36 @@ function formatTime(seconds: number): string {
   }
 }
 
-// Initialize when DOM is ready
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'toggleWidget') {
+    togglePanel(true);
+    sendResponse({ success: true });
+    return;
+  }
+
+  if (request.action === 'refreshActiveTask') {
+    chrome.storage.local.get(['taskBreakdownSession'], (result) => {
+      updateMinimizedInfo(result.taskBreakdownSession || null);
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+});
+
+function initializeWidget() {
+  chrome.storage.local.get([STORAGE_KEY], (result) => {
+    if (result[STORAGE_KEY]) {
+      widgetState = { ...widgetState, ...result[STORAGE_KEY] };
+    }
+    const clamped = clampPosition(widgetState.left, widgetState.top);
+    widgetState.left = clamped.left;
+    widgetState.top = clamped.top;
+    createFloatingWidget();
+  });
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', createFloatingButton);
+  document.addEventListener('DOMContentLoaded', initializeWidget);
 } else {
-  createFloatingButton();
+  initializeWidget();
 }

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Subtask } from '../../types';
-import { updateSubtaskStatus, addTimeToSubtask, loadSession, saveSession } from '../../utils/storage';
+import {
+  updateSubtaskStatus,
+  addTimeToSubtask,
+  loadSession,
+  saveSession,
+  setCurrentSubtask,
+} from '../../utils/storage';
 import '../styles/timer.css';
 
 interface TimerProps {
@@ -23,32 +29,42 @@ const Timer: React.FC<TimerProps> = ({ subtask, taskId, onStart }) => {
     };
   }, [intervalId]);
 
-  const handleStartClick = async () => {
+  const handleStartClick = () => {
     if (timerState === 'idle') {
       setTimerState('countdown');
       setCountdownValue(5);
       onStart();
-      await updateSubtaskStatus(taskId, subtask.id, 'in-progress');
     }
   };
 
   const handlePauseClick = async () => {
     if (timerState === 'running') {
       setTimerState('paused');
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) {
+        clearInterval(intervalId);
+        setIntervalId(null);
+      }
+      await updateSubtaskStatus(taskId, subtask.id, 'paused');
+      await setCurrentSubtask(null, null);
     }
   };
 
-  const handleResumeClick = () => {
+  const handleResumeClick = async () => {
     if (timerState === 'paused') {
+      await setCurrentSubtask(taskId, subtask.id);
+      await updateSubtaskStatus(taskId, subtask.id, 'in-progress');
       setTimerState('running');
     }
   };
 
   const handleStopClick = async () => {
     setTimerState('idle');
-    if (intervalId) clearInterval(intervalId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      setIntervalId(null);
+    }
     await updateSubtaskStatus(taskId, subtask.id, 'completed');
+    await setCurrentSubtask(null, null);
   };
 
   // Countdown timer effect
@@ -60,12 +76,16 @@ const Timer: React.FC<TimerProps> = ({ subtask, taskId, onStart }) => {
         }, 1000);
         return () => clearTimeout(timeout);
       } else {
-        // Countdown finished, start stopwatch
-        setTimerState('running');
-        setElapsedTime(subtask.timeSpent);
+        // Countdown finished, start stopwatch and record the start moment.
+        const startRunning = async () => {
+          await updateSubtaskStatus(taskId, subtask.id, 'in-progress');
+          setTimerState('running');
+          setElapsedTime(subtask.timeSpent);
+        };
+        startRunning();
       }
     }
-  }, [timerState, countdownValue, subtask.timeSpent]);
+  }, [timerState, countdownValue, subtask.timeSpent, taskId, subtask.id]);
 
   // Stopwatch effect
   useEffect(() => {

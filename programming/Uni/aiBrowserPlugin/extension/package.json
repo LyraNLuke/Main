@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "webpack --mode development --watch",
     "build": "webpack --mode production",
+    "postbuild": "node scripts/copyAssets.js",
     "test": "jest"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "@babel/preset-typescript": "^7.22.0",
     "css-loader": "^6.8.0",
     "style-loader": "^3.3.0",
-    "ts-loader": "^9.4.0"
+    "ts-loader": "^9.4.0",
+    "copy-webpack-plugin": "^11.0.0"
   }
 }

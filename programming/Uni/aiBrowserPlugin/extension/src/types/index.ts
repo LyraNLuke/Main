@@ -10,7 +10,7 @@ export interface Subtask {
   id: string;
   title: string;
   description?: string;
-  status: 'pending' | 'in-progress' | 'completed';
+  status: 'pending' | 'in-progress' | 'paused' | 'completed';
   timeSpent: number; // in seconds
   startTime?: number;
   createdAt: number;

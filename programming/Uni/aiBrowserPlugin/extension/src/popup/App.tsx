@@ -36,6 +36,9 @@ const App: React.FC = () => {
 
   const handleStartSubtask = async (taskId: string, subtaskId: string) => {
     await setCurrentSubtask(taskId, subtaskId);
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ action: 'refreshActiveTask' });
+    }
     await loadSessionData();
   };
 

@@ -36,17 +36,30 @@ export async function addTask(task: Task): Promise<void> {
 export async function updateSubtaskStatus(
   taskId: string,
   subtaskId: string,
-  status: 'pending' | 'in-progress' | 'completed'
+  status: 'pending' | 'in-progress' | 'paused' | 'completed'
 ): Promise<void> {
   const session = await loadSession();
   const task = session.tasks.find((t) => t.id === taskId);
   if (task) {
     const subtask = task.subtasks.find((s) => s.id === subtaskId);
     if (subtask) {
+      if (status === 'paused' || status === 'completed') {
+        if (subtask.startTime) {
+          subtask.timeSpent += Math.floor((Date.now() - subtask.startTime) / 1000);
+          delete subtask.startTime;
+        }
+      }
+
       subtask.status = status;
+
       if (status === 'in-progress') {
         subtask.startTime = Date.now();
       }
+
+      if (status === 'pending') {
+        delete subtask.startTime;
+      }
+
       await saveSession(session);
     }
   }
@@ -63,6 +76,9 @@ export async function addTimeToSubtask(
     const subtask = task.subtasks.find((s) => s.id === subtaskId);
     if (subtask) {
       subtask.timeSpent += seconds;
+      if (subtask.status === 'in-progress') {
+        subtask.startTime = Date.now();
+      }
       await saveSession(session);
     }
   }

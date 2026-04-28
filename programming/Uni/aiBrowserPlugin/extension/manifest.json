@@ -5,19 +5,19 @@
   "description": "Break down your tasks into manageable subtasks with AI, and track time spent on each",
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "windows"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "images/icon-16.png",
-      "48": "images/icon-48.png",
-      "128": "images/icon-128.png"
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html"],
+      "matches": ["<all_urls>"]
     }
-  },
+  ],
+  "action": {},
   "background": {
     "service_worker": "background.js"
   },
@@ -27,10 +27,5 @@
       "js": ["content.js"],
       "css": ["styles/content.css"]
     }
-  ],
-  "icons": {
-    "16": "images/icon-16.png",
-    "48": "images/icon-48.png",
-    "128": "images/icon-128.png"
-  }
+  ]
 }

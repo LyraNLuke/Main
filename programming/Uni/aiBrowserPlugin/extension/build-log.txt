@@ -1,0 +1,76 @@
+
+> ai-task-breakdown-extension@1.0.0 build
+> webpack --mode production
+
+popup:
+  assets by path [1m[32mpopup/[39m[22m 3.45 KiB 12 assets
+  assets by path [1m[32mutils/[39m[22m 1.85 KiB
+    assets by path [1m[32mutils/*.map[39m[22m 964 bytes 2 assets
+    assets by path [1m[32mutils/*.ts[39m[22m 928 bytes 2 assets
+  assets by path [1m[32mcontent/[39m[22m 1.75 KiB
+    asset [1m[32mcontent/content.d.ts[39m[22m 994 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mcontent/content.d.ts.map[39m[22m 801 bytes [1m[33m[compared for emit][39m[22m
+  assets by path [1m[32mtypes/[39m[22m 1.16 KiB
+    asset [1m[32mtypes/index.d.ts.map[39m[22m 663 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mtypes/index.d.ts[39m[22m 526 bytes [1m[33m[compared for emit][39m[22m
+  assets by path [1m[32mbackground/[39m[22m 841 bytes
+    asset [1m[32mbackground/service-worker.d.ts[39m[22m 498 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mbackground/service-worker.d.ts.map[39m[22m 343 bytes [1m[33m[compared for emit][39m[22m
+  + 4 assets
+  orphan modules 24.6 KiB [1m[33m[orphan][39m[22m 12 modules
+  runtime modules 698 bytes 4 modules
+  cacheable modules 186 KiB
+    modules by path [1m./node_modules/[39m[22m 151 KiB
+      modules by path [1m./node_modules/style-loader/dist/runtime/*.js[39m[22m 5.84 KiB 6 modules
+      modules by path [1m./node_modules/react/[39m[22m 8 KiB 4 modules
+      modules by path [1m./node_modules/react-dom/[39m[22m 131 KiB 3 modules
+      modules by path [1m./node_modules/scheduler/[39m[22m 4.33 KiB 2 modules
+      modules by path [1m./node_modules/css-loader/dist/runtime/*.js[39m[22m 2.31 KiB 2 modules
+    modules by path [1m./src/popup/[39m[22m 34.9 KiB
+      [1m./src/popup/index.tsx + 12 modules[39m[22m 24.9 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+      ./node_modules/css-loader/dist/cjs.js![1m./src/popup/styles/popup.css[39m[22m 925 bytes [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+      ./node_modules/css-loader/dist/cjs.js![1m./src/popup/styles/task-input.css[39m[22m 2.37 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+      ./node_modules/css-loader/dist/cjs.js![1m./src/popup/styles/task-list.css[39m[22m 1.69 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+      + 2 modules
+  [1mpopup[39m[22m (webpack 5.106.2) compiled [1m[32msuccessfully[39m[22m in 33725 ms
+
+background:
+  assets by path [1m[32mpopup/[39m[22m 3.45 KiB 12 assets
+  assets by path [1m[32mutils/[39m[22m 1.85 KiB
+    assets by path [1m[32mutils/*.map[39m[22m 964 bytes 2 assets
+    assets by path [1m[32mutils/*.ts[39m[22m 928 bytes 2 assets
+  assets by path [1m[32mcontent/[39m[22m 1.75 KiB
+    asset [1m[32mcontent/content.d.ts[39m[22m 994 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mcontent/content.d.ts.map[39m[22m 801 bytes [1m[33m[compared for emit][39m[22m
+  assets by path [1m[32mtypes/[39m[22m 1.16 KiB
+    asset [1m[32mtypes/index.d.ts.map[39m[22m 663 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mtypes/index.d.ts[39m[22m 526 bytes [1m[33m[compared for emit][39m[22m
+  assets by path [1m[32mbackground/[39m[22m 841 bytes
+    asset [1m[32mbackground/service-worker.d.ts[39m[22m 498 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mbackground/service-worker.d.ts.map[39m[22m 343 bytes [1m[33m[compared for emit][39m[22m
+  asset [1m[32mbackground.js[39m[22m 1.51 KiB [1m[33m[compared for emit][39m[22m [1m[32m[minimized][39m[22m (name: main)
+  [1m./src/background/service-worker.ts[39m[22m 3.4 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+  [1mbackground[39m[22m (webpack 5.106.2) compiled [1m[32msuccessfully[39m[22m in 23930 ms
+
+content:
+  assets by path [1m[32mpopup/[39m[22m 3.45 KiB 12 assets
+  assets by path [1m[32mutils/[39m[22m 1.85 KiB
+    assets by path [1m[32mutils/*.map[39m[22m 964 bytes 2 assets
+    assets by path [1m[32mutils/*.ts[39m[22m 928 bytes 2 assets
+  assets by path [1m[32mcontent/[39m[22m 1.75 KiB
+    asset [1m[32mcontent/content.d.ts[39m[22m 994 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mcontent/content.d.ts.map[39m[22m 801 bytes [1m[33m[compared for emit][39m[22m
+  assets by path [1m[32mtypes/[39m[22m 1.16 KiB
+    asset [1m[32mtypes/index.d.ts.map[39m[22m 663 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mtypes/index.d.ts[39m[22m 526 bytes [1m[33m[compared for emit][39m[22m
+  assets by path [1m[32mbackground/[39m[22m 841 bytes
+    asset [1m[32mbackground/service-worker.d.ts[39m[22m 498 bytes [1m[33m[compared for emit][39m[22m
+    asset [1m[32mbackground/service-worker.d.ts.map[39m[22m 343 bytes [1m[33m[compared for emit][39m[22m
+  asset [1m[32mcontent.js[39m[22m 3.84 KiB [1m[33m[compared for emit][39m[22m [1m[32m[minimized][39m[22m (name: main)
+  [1m./src/content/content.ts[39m[22m 6.69 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+  [1mcontent[39m[22m (webpack 5.106.2) compiled [1m[32msuccessfully[39m[22m in 24696 ms
+
+> ai-task-breakdown-extension@1.0.0 postbuild
+> node scripts/copyAssets.js
+
+Copied manifest.json and public assets to dist/
