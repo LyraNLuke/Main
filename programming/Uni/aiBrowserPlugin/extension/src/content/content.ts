@@ -7,6 +7,8 @@ interface WidgetState {
   isOpen: boolean;
   left: number;
   top: number;
+  minimizedLeft?: number;
+  minimizedTop?: number;
 }
 
 const STORAGE_KEY = 'taskAssistantWidgetState';
@@ -24,6 +26,8 @@ let widgetState: WidgetState = {
 let isDragging = false;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
+let lastClampedLeft = 0;
+let lastClampedTop = 0;
 let widgetContainer: HTMLDivElement | null = null;
 let panelWrapper: HTMLDivElement | null = null;
 let minimizedBar: HTMLDivElement | null = null;
@@ -33,14 +37,15 @@ let minimizedStatusIcon: HTMLSpanElement | null = null;
 let toggleButton: HTMLButtonElement | null = null;
 let activeSession: any = null;
 let minimizedTimerInterval: number | null = null;
+let countdownState: any = null;
 
 function saveWidgetState() {
   chrome.storage.local.set({ [STORAGE_KEY]: widgetState });
 }
 
-function clampPosition(left: number, top: number) {
-  const width = widgetState.isOpen ? DEFAULT_WIDGET_WIDTH : MINIMIZED_WIDTH;
-  const height = widgetState.isOpen ? DEFAULT_WIDGET_HEIGHT : MINIMIZED_HEIGHT;
+function clampPosition(left: number, top: number, forceWidth?: number, forceHeight?: number) {
+  const width = forceWidth !== undefined ? forceWidth : (widgetState.isOpen ? DEFAULT_WIDGET_WIDTH : MINIMIZED_WIDTH);
+  const height = forceHeight !== undefined ? forceHeight : (widgetState.isOpen ? DEFAULT_WIDGET_HEIGHT : MINIMIZED_HEIGHT);
   const maxLeft = Math.max(10, window.innerWidth - width - 10);
   const maxTop = Math.max(10, window.innerHeight - height - 10);
   return {
@@ -56,20 +61,21 @@ function applyWidgetPosition() {
 }
 
 function findActiveSubtask(session: any) {
-  if (!session || !Array.isArray(session.tasks)) return null;
+  if (!session || !Array.isArray(session.tasks) || session.tasks.length === 0) return null;
 
   // Prefer the currently marked active task, but only if it is still in-progress.
   if (session.currentTaskId && session.currentSubtaskId) {
     const task = session.tasks.find((t: any) => t.id === session.currentTaskId);
     const subtask = task?.subtasks?.find((s: any) => s.id === session.currentSubtaskId);
-    if (task && subtask && subtask.status === 'in-progress') {
+    if (task && subtask && subtask.status === 'in-progress' && subtask.startTime) {
       return { task, subtask };
     }
   }
 
   // Fall back to any in-progress subtasks if the IDs were not persisted correctly.
   for (const task of session.tasks) {
-    const subtask = task.subtasks.find((s: any) => s.status === 'in-progress');
+    if (!Array.isArray(task.subtasks)) continue;
+    const subtask = task.subtasks.find((s: any) => s.status === 'in-progress' && s.startTime);
     if (subtask) return { task, subtask };
   }
 
@@ -130,6 +136,45 @@ function togglePanel(shouldOpen?: boolean) {
     widgetState.isOpen = false;
   }
 
+  // Swap positions between expanded and minimized
+  if (widgetState.isOpen) {
+    // Expanding - use expanded position or create one
+    if (widgetState.minimizedLeft !== undefined && widgetState.minimizedTop !== undefined) {
+      // Save current minimized position
+      const tempLeft = widgetState.left;
+      const tempTop = widgetState.top;
+      // Restore expanded position
+      widgetState.left = widgetState.minimizedLeft;
+      widgetState.top = widgetState.minimizedTop;
+      widgetState.minimizedLeft = tempLeft;
+      widgetState.minimizedTop = tempTop;
+    }
+    // Clamp to screen bounds for the expanded size
+    const clampedForPanel = clampPosition(widgetState.left, widgetState.top, DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT);
+    widgetState.left = clampedForPanel.left;
+    widgetState.top = clampedForPanel.top;
+  } else {
+    // Minimizing - swap to minimized position
+    if (widgetState.minimizedLeft === undefined || widgetState.minimizedTop === undefined) {
+      // First time minimizing, save current position as expanded
+      widgetState.minimizedLeft = widgetState.left;
+      widgetState.minimizedTop = widgetState.top;
+    } else {
+      // Swap positions
+      const tempLeft = widgetState.left;
+      const tempTop = widgetState.top;
+      widgetState.left = widgetState.minimizedLeft;
+      widgetState.top = widgetState.minimizedTop;
+      widgetState.minimizedLeft = tempLeft;
+      widgetState.minimizedTop = tempTop;
+    }
+    // Clamp to screen bounds for minimized size
+    const clampedForMinimized = clampPosition(widgetState.left, widgetState.top, MINIMIZED_WIDTH, MINIMIZED_HEIGHT);
+    widgetState.left = clampedForMinimized.left;
+    widgetState.top = clampedForMinimized.top;
+  }
+
+  applyWidgetPosition();
   saveWidgetState();
   refreshWidgetView();
 }
@@ -156,6 +201,16 @@ function stopMinimizedTimer() {
 
 function startMinimizedTimer() {
   stopMinimizedTimer();
+  
+  // Update immediately first
+  if (activeSession && hasActiveTask(activeSession)) {
+    const activeTaskDisplay = getActiveTaskDisplay(activeSession);
+    if (activeTaskDisplay && minimizedTime) {
+      minimizedTime.textContent = activeTaskDisplay.time;
+    }
+  }
+  
+  // Then update every 1 second
   minimizedTimerInterval = window.setInterval(() => {
     if (!activeSession || !hasActiveTask(activeSession)) {
       stopMinimizedTimer();
@@ -266,7 +321,10 @@ function createFloatingWidget() {
     closeButton.style.background = 'rgba(0, 0, 0, 0.08)';
     closeButton.style.transform = 'scale(1)';
   });
-  closeButton.addEventListener('click', () => togglePanel(false));
+  closeButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePanel(false);
+  });
 
   panelHeader.appendChild(closeButton);
 
@@ -431,37 +489,98 @@ function createFloatingWidget() {
   });
   toggleButton.addEventListener('click', () => togglePanel(true));
 
+  // Drag handling - only from draggable areas, not from buttons
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let pointerDownTime = 0;
+
   const dragStart = (event: PointerEvent) => {
+    // Reject if clicking a button that's not meant for dragging
     if ((event.target as HTMLElement).closest('button')) {
       return;
     }
+    
     isDragging = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    pointerDownTime = Date.now();
     dragOffsetX = event.clientX - widgetState.left;
     dragOffsetY = event.clientY - widgetState.top;
+    lastClampedLeft = widgetState.left;
+    lastClampedTop = widgetState.top;
     event.preventDefault();
+    if (widgetContainer && 'setPointerCapture' in event) {
+      (event as any).setPointerCapture((event as any).pointerId);
+    }
   };
 
+  // Only add drag listeners to the header and minimized bar areas
   panelHeader.addEventListener('pointerdown', dragStart);
   minimizedBar.addEventListener('pointerdown', dragStart);
-  if (widgetContainer) {
-    widgetContainer.addEventListener('pointerdown', dragStart);
-  }
 
-  document.addEventListener('pointermove', (event) => {
+  // Also allow dragging the round button itself
+  toggleButton.addEventListener('pointerdown', (event: PointerEvent) => {
+    if ((event.target as HTMLElement) === toggleButton) {
+      isDragging = true;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      pointerDownTime = Date.now();
+      dragOffsetX = event.clientX - widgetState.left;
+      dragOffsetY = event.clientY - widgetState.top;
+      lastClampedLeft = widgetState.left;
+      lastClampedTop = widgetState.top;
+      event.preventDefault();
+      if (widgetContainer && 'setPointerCapture' in event) {
+        (event as any).setPointerCapture((event as any).pointerId);
+      }
+    }
+  });
+
+  const handlePointerMove = (event: PointerEvent) => {
     if (!isDragging || !widgetContainer) return;
+    
+    // Calculate distance moved
+    const distX = event.clientX - dragStartX;
+    const distY = event.clientY - dragStartY;
+    const distance = Math.sqrt(distX * distX + distY * distY);
+    
+    // Only start dragging if moved more than 5px
+    if (distance < 5) {
+      return;
+    }
+    
     const left = event.clientX - dragOffsetX;
     const top = event.clientY - dragOffsetY;
-    const clamped = clampPosition(left, top);
+    const clamped = clampPosition(left, top, widgetState.isOpen ? DEFAULT_WIDGET_WIDTH : MINIMIZED_WIDTH, widgetState.isOpen ? DEFAULT_WIDGET_HEIGHT : MINIMIZED_HEIGHT);
+    
+    // Update offset if we were clamped to prevent jumping
+    if (clamped.left !== left || clamped.top !== top) {
+      dragOffsetX = event.clientX - clamped.left;
+      dragOffsetY = event.clientY - clamped.top;
+    }
+    
     widgetState.left = clamped.left;
     widgetState.top = clamped.top;
     applyWidgetPosition();
-  });
+  };
 
-  document.addEventListener('pointerup', () => {
+  const handlePointerUp = (event: PointerEvent) => {
     if (!isDragging) return;
     isDragging = false;
-    saveWidgetState();
-  });
+    
+    // Calculate distance moved
+    const distX = event.clientX - dragStartX;
+    const distY = event.clientY - dragStartY;
+    const distance = Math.sqrt(distX * distX + distY * distY);
+    
+    // Only save if we actually dragged (more than 5px)
+    if (distance > 5) {
+      saveWidgetState();
+    }
+  };
+
+  document.addEventListener('pointermove', handlePointerMove);
+  document.addEventListener('pointerup', handlePointerUp);
 
   widgetContainer.appendChild(panelWrapper);
   widgetContainer.appendChild(minimizedBar);

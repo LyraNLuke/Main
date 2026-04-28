@@ -69,7 +69,14 @@ const Timer: React.FC<TimerProps> = ({ subtask, taskId, onStart }) => {
 
   // Countdown timer effect
   useEffect(() => {
+    // Store countdown state in Chrome storage for content script to display
     if (timerState === 'countdown') {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        chrome.storage.local.set({ 
+          timerCountdown: { taskId, subtaskId: subtask.id, value: countdownValue }
+        });
+      }
+
       if (countdownValue > 0) {
         const timeout = setTimeout(() => {
           setCountdownValue(countdownValue - 1);
@@ -81,8 +88,17 @@ const Timer: React.FC<TimerProps> = ({ subtask, taskId, onStart }) => {
           await updateSubtaskStatus(taskId, subtask.id, 'in-progress');
           setTimerState('running');
           setElapsedTime(subtask.timeSpent);
+          // Clear countdown from storage
+          if (typeof chrome !== 'undefined' && chrome.storage) {
+            chrome.storage.local.set({ timerCountdown: null });
+          }
         };
         startRunning();
+      }
+    } else {
+      // Clear countdown from storage when not in countdown mode
+      if (typeof chrome !== 'undefined' && chrome.storage && timerState !== undefined) {
+        chrome.storage.local.set({ timerCountdown: null });
       }
     }
   }, [timerState, countdownValue, subtask.timeSpent, taskId, subtask.id]);
