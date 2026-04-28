@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\Users\Brian Geisler\gitSynced\main"
+cd /d "%~dp0"
 git pull origin master
 git add .
 git commit -m "Auto sync %date% %time%"
