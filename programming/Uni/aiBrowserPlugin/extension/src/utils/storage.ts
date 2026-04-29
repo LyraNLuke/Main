@@ -60,6 +60,11 @@ export async function updateSubtaskStatus(
         delete subtask.startTime;
       }
 
+      if (status !== 'in-progress' && session.currentTaskId === taskId && session.currentSubtaskId === subtaskId) {
+        session.currentTaskId = null;
+        session.currentSubtaskId = null;
+      }
+
       await saveSession(session);
     }
   }
