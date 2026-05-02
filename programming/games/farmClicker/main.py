@@ -30,17 +30,17 @@ upgrades = [
     {"name": "Chicken Coop", "cost": 100, "passive_bonus": 2, "bought": False}
 ]
 
-def draw_shop(screen, fon, coins, upgrades):
-    panel = pygame.Rect(900, 50, 350, 620)
+def draw_shop(screen, font, coins, upgrades):
+    panel = pygame.Rect(20, 70, 350, 620)
     pygame.draw.rect(screen, (245, 222, 179), panel)
     pygame.draw.rect(screen, (139, 90, 43,), panel, 4)
     
     title = font.render("Shop", True, (0, 0, 0))
-    screen.blit(title, (980, 60))
+    screen.blit(title, (40, 80))
     
     buttons = []
     for i, upg in enumerate(upgrades):
-        btn = pygame.Rect(920, 120 + i * 100, 310, 70)
+        btn = pygame.Rect(40, 130 + i * 100, 310, 70)
         color = (180, 220, 180) if not upg["bought"] else (200, 200, 200)
         pygame.draw.rect(screen, color, btn, border_radius=8)
         

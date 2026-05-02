@@ -1,0 +1,14 @@
+I want the game to work in the following way::
+
+1 - U have a farm to tend to, from which you get recources.
+2 - from the gained resouces you then produce, foods and drinks,
+3 - which you then sell at your bar, to gain money
+4 - and ubgrade your things to get more resources and money
+
+
+it should have the following features:: 
+
+1 - multiple ubgrades and improvement to farm and bar
+2 - a certain demand, which displays the estemated amount that will be selled this day of a certain item
+3 - popularity system, which can increase demand
+4 - 
