@@ -1,0 +1,27 @@
+﻿name: Local Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Qwen2.5 Coder 14B (Chat)
+    provider: ollama
+    model: qwen2.5-coder:14b
+    roles:
+      - chat
+      - edit
+      - apply
+    contextLength: 8192
+    systemMessage: |
+
+
+  - name: Starcoder2 7B (Autocomplete)
+    provider: ollama
+    model: starcoder2:7b
+    roles:
+      - autocomplete
+    contextLength: 4096
+
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text:latest
+    roles:
+      - embed
